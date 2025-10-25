@@ -5,7 +5,7 @@
 #define I2S_DOUT      1
 #define I2S_BCLK      2
 #define I2S_LRC       3
-
+ 
 int result;
 bool read_result;
 esp_err_t error;
