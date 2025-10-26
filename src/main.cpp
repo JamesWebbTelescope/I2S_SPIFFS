@@ -12,9 +12,28 @@ esp_err_t error;
 
 Audio audio;
 
+hw_timer_t *timer = NULL;
+volatile SemaphoreHandle_t timerSemaphore;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
+volatile uint32_t isrCounter = 0;
+volatile uint32_t lastIsrAt = 0;
+
+void ARDUINO_ISR_ATTR onTimer() {
+  // Increment the counter and set the time of ISR
+  portENTER_CRITICAL_ISR(&timerMux);
+  isrCounter = isrCounter + 1;
+  lastIsrAt = millis();
+  portEXIT_CRITICAL_ISR(&timerMux);
+  // Give a semaphore that we can check in the loop
+  xSemaphoreGiveFromISR(timerSemaphore, NULL);
+  // It is safe to use digitalRead/Write here if you want to toggle an output
+}
+
 void setup() {
   Serial.begin(9600);
-  
+  pinMode(LED_RED, OUTPUT);
+  digitalWrite(LED_RED, LOW);
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
@@ -25,13 +44,16 @@ void setup() {
     Serial.println("Failed to open file for reading");
     return;
   }
-  
-  Serial.println("File Content:");
-  while(file.available()){
-    result = file.read();
-    Serial.write(file.read());
-  }
-  file.close();
+
+  timerSemaphore = xSemaphoreCreateBinary();
+
+  // Set timer frequency to 1Mhz
+  timer = timerBegin(1000000);
+
+  // Attach onTimer function to our timer.
+  timerAttachInterrupt(timer, &onTimer);
+
+  timerAlarm(timer, 1000000, true, 0);
 
   error = audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
     
@@ -45,20 +67,6 @@ void setup() {
 void loop() {
     Serial.println("Hello there!");
     Serial.println(result);
-    /*File file = SPIFFS.open("/05 Synthetic Bloodline.mp3", "r");
-    Serial.println(file.name());
-    if(!file){
-      Serial.println("Failed to open file for reading");
-      return;
-    }
-    
-    Serial.println("File Content:");
-    while(file.available()){
-      result = file.read();
-      Serial.println("Available");
-      Serial.write(file.read());
-    }
-    file.close();*/
     Serial.println(read_result);
     Serial.println(esp_err_to_name(error));
     audio.loop(); 
