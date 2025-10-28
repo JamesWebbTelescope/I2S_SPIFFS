@@ -15,6 +15,7 @@
 int result;
 bool read_result;
 volatile bool pin_state = 0;
+bool deviceConnected = false;
 esp_err_t error;
 
 Audio audio;
@@ -26,10 +27,28 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t isrCounter = 0;
 volatile uint32_t lastIsrAt = 0;
 
+class MyServerCallbacks: public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) {
+    deviceConnected = true;
+    Serial.println("Device Connected");
+  };
+  void onDisconnect(BLEServer* pServer) {
+    deviceConnected = false;
+    Serial.println("Device Disconnected");
+  }
+  void onWrite(BLECharacteristic* pCharacteristic)
+  {
+    String value = pCharacteristic->getValue();
+    Serial.print("Characteristic event, written: ");
+    Serial.println(static_cast<int>(value[0])); // Print the integer value
+  }
+};
+
 void BluetoothSetup()
 {
   BLEDevice::init("Concert ESP32S3");
   BLEServer *pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
   BLEService *pService = pServer->createService(SERVICE_UUID);
   BLECharacteristic *pCharacteristic = pService->createCharacteristic(
                                          CHARACTERISTIC_UUID,
