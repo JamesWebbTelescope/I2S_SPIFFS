@@ -9,7 +9,7 @@
  
 int result;
 bool read_result;
-bool pin_state = 0;
+volatile bool pin_state = 0;
 esp_err_t error;
 
 Audio audio;
@@ -21,23 +21,16 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t isrCounter = 0;
 volatile uint32_t lastIsrAt = 0;
 
-void ARDUINO_ISR_ATTR onTimer() {
+void IRAM_ATTR onTimer() {
   // Increment the counter and set the time of ISR
-  portENTER_CRITICAL_ISR(&timerMux);
-  isrCounter = isrCounter + 1;
-  pin_state = ~pin_state;
+  digitalWrite(RED_PIN, !digitalRead(RED_PIN));
   //digitalWrite(RED_PIN, !digitalRead(RED_PIN));
-  portEXIT_CRITICAL_ISR(&timerMux);
-  // Give a semaphore that we can check in the loop
-  xSemaphoreGiveFromISR(timerSemaphore, NULL);
-  // It is safe to use digitalRead/Write here if you want to toggle an output
 }
 
 void setup() {
   Serial.begin(9600);
   pinMode(LED_RED, OUTPUT);
   pinMode(RED_PIN, OUTPUT);
-  digitalWrite(LED_RED, LOW);
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
@@ -73,7 +66,6 @@ void loop() {
     Serial.println(result);
     Serial.println(read_result);
     Serial.println(esp_err_to_name(error));
-    //digitalWrite(RED_PIN, pin_state);
     audio.loop(); 
     vTaskDelay(1);
 }
