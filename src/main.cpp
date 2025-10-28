@@ -5,9 +5,11 @@
 #define I2S_DOUT      1
 #define I2S_BCLK      2
 #define I2S_LRC       3
+#define RED_PIN       10
  
 int result;
 bool read_result;
+bool pin_state = 0;
 esp_err_t error;
 
 Audio audio;
@@ -23,7 +25,8 @@ void ARDUINO_ISR_ATTR onTimer() {
   // Increment the counter and set the time of ISR
   portENTER_CRITICAL_ISR(&timerMux);
   isrCounter = isrCounter + 1;
-  lastIsrAt = millis();
+  pin_state = ~pin_state;
+  //digitalWrite(RED_PIN, !digitalRead(RED_PIN));
   portEXIT_CRITICAL_ISR(&timerMux);
   // Give a semaphore that we can check in the loop
   xSemaphoreGiveFromISR(timerSemaphore, NULL);
@@ -33,6 +36,7 @@ void ARDUINO_ISR_ATTR onTimer() {
 void setup() {
   Serial.begin(9600);
   pinMode(LED_RED, OUTPUT);
+  pinMode(RED_PIN, OUTPUT);
   digitalWrite(LED_RED, LOW);
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
@@ -69,6 +73,7 @@ void loop() {
     Serial.println(result);
     Serial.println(read_result);
     Serial.println(esp_err_to_name(error));
+    //digitalWrite(RED_PIN, pin_state);
     audio.loop(); 
     vTaskDelay(1);
 }
