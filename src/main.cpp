@@ -4,6 +4,7 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
 
 #define I2S_DOUT      1
 #define I2S_BCLK      2
@@ -11,11 +12,15 @@
 #define RED_PIN       10
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#define LED_CHARACTERISTIC_UUID "19b10002-e8f2-537e-4f6c-d104768a1214"
 
 int result;
 bool read_result;
 volatile bool pin_state = 0;
 bool deviceConnected = false;
+BLECharacteristic *pCharacteristic;
+BLECharacteristic *pLedCharacteristic;
+BLEService *pService;
 esp_err_t error;
 
 Audio audio;
@@ -31,16 +36,12 @@ class MyServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
     Serial.println("Device Connected");
+    BLEDevice::getAdvertising()->stop();
   };
   void onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
     Serial.println("Device Disconnected");
-  }
-  void onWrite(BLECharacteristic* pCharacteristic)
-  {
-    String value = pCharacteristic->getValue();
-    Serial.print("Characteristic event, written: ");
-    Serial.println(static_cast<int>(value[0])); // Print the integer value
+    BLEDevice::getAdvertising()->start();
   }
 };
 
@@ -53,17 +54,29 @@ void BluetoothSetup()
   BLECharacteristic *pCharacteristic = pService->createCharacteristic(
                                          CHARACTERISTIC_UUID,
                                          BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE
+                                         BLECharacteristic::PROPERTY_WRITE |
+                                         BLECharacteristic::PROPERTY_INDICATE |
+                                         BLECharacteristic::PROPERTY_NOTIFY
                                        );
 
-  pCharacteristic->setValue("Hello World says Neil");
+  pLedCharacteristic = pService->createCharacteristic(
+                      LED_CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_NOTIFY |
+                      BLECharacteristic::PROPERTY_WRITE |
+                      BLECharacteristic::PROPERTY_READ
+                    );
+  BLEDescriptor ledDescriptor(BLEUUID((uint16_t)0x2902));
+  // Register the callback for the ON button characteristic
+  pLedCharacteristic->setValue("Control music");
+  pCharacteristic->setValue("Hello World says Viktor");
+  pService->addCharacteristic(pLedCharacteristic);
   pService->start();
   // BLEAdvertising *pAdvertising = pServer->getAdvertising();  // this still is working for backward compatibility
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(true);
-  pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
-  pAdvertising->setMinPreferred(0x12);
+  pAdvertising->setScanResponse(false);
+  pAdvertising->setMinPreferred(0x0);  // functions that help with iPhone connections issue
+ // pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
 }
 
@@ -109,10 +122,15 @@ void setup() {
 }
  
 void loop() {
-    Serial.println("Hello there!");
-    Serial.println(result);
-    Serial.println(read_result);
-    Serial.println(esp_err_to_name(error));
+    String tt = pLedCharacteristic->getValue();
+    if(tt.isEmpty()!=0)
+    {
+      Serial.println(tt);
+    }
+    //Serial.println("Hello there!");
+    //Serial.println(result);
+    //Serial.println(read_result);
+    //Serial.println(esp_err_to_name(error));
     audio.loop(); 
     vTaskDelay(1);
 }
