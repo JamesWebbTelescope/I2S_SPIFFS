@@ -19,7 +19,12 @@ bool read_result;
 volatile bool pin_state = 0;
 bool deviceConnected = false;
 BLECharacteristic *pCharacteristic;
-BLECharacteristic *pLedCharacteristic;
+BLECharacteristic pLedCharacteristic(LED_CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_NOTIFY |
+                      BLECharacteristic::PROPERTY_WRITE |
+                      BLECharacteristic::PROPERTY_READ
+                    );
+BLEDescriptor pLedtDescriptor(BLEUUID((uint16_t)0x2902));
 BLEService *pService;
 esp_err_t error;
 
@@ -58,18 +63,10 @@ void BluetoothSetup()
                                          BLECharacteristic::PROPERTY_INDICATE |
                                          BLECharacteristic::PROPERTY_NOTIFY
                                        );
-
-  pLedCharacteristic = pService->createCharacteristic(
-                      LED_CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_NOTIFY |
-                      BLECharacteristic::PROPERTY_WRITE |
-                      BLECharacteristic::PROPERTY_READ
-                    );
-  BLEDescriptor ledDescriptor(BLEUUID((uint16_t)0x2902));
   // Register the callback for the ON button characteristic
-  pLedCharacteristic->setValue("Control music");
   pCharacteristic->setValue("Hello World says Viktor");
-  pService->addCharacteristic(pLedCharacteristic);
+  pService->addCharacteristic(&pLedCharacteristic);
+  pLedCharacteristic.addDescriptor(&pLedtDescriptor);
   pService->start();
   // BLEAdvertising *pAdvertising = pServer->getAdvertising();  // this still is working for backward compatibility
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
@@ -122,15 +119,19 @@ void setup() {
 }
  
 void loop() {
-    String tt = pLedCharacteristic->getValue();
-    if(tt.isEmpty()!=0)
+    String tt = pLedCharacteristic.getValue();
+    if(tt.length() > 0)
     {
-      Serial.println(tt);
+      Serial.println(tt.c_str());
     }
     //Serial.println("Hello there!");
     //Serial.println(result);
     //Serial.println(read_result);
     //Serial.println(esp_err_to_name(error));
-    audio.loop(); 
+    if(tt.length() > 0)
+    {
+      Serial.println("Playing");
+      audio.loop();
+    } 
     vTaskDelay(1);
 }
