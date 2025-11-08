@@ -10,7 +10,8 @@
 #define I2S_DOUT      1
 #define I2S_BCLK      2
 #define I2S_LRC       3
-#define RED_PIN       17
+#define RED_PIN1      17
+#define RED_PIN2      21 
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #define LED_CHARACTERISTIC_UUID "19b10002-e8f2-537e-4f6c-d104768a1214"
@@ -31,9 +32,12 @@ esp_err_t error;
 
 Audio audio;
 
-hw_timer_t *timer = NULL;
-volatile SemaphoreHandle_t timerSemaphore;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+hw_timer_t *timer1 = NULL;
+hw_timer_t *timer2 = NULL;
+volatile SemaphoreHandle_t timer1Semaphore;
+volatile SemaphoreHandle_t timer2Semaphore;
+portMUX_TYPE timer1Mux = portMUX_INITIALIZER_UNLOCKED;
+portMUX_TYPE timer2Mux = portMUX_INITIALIZER_UNLOCKED;
 
 volatile uint32_t isrCounter = 0;
 volatile uint32_t lastIsrAt = 0;
@@ -78,20 +82,31 @@ void BluetoothSetup()
   BLEDevice::startAdvertising();
 }
 
-void IRAM_ATTR onTimer() {
+void IRAM_ATTR onTimer1() {
   // Increment the counter and set the time of ISR
-  portENTER_CRITICAL_ISR(&timerMux);
-  digitalWrite(RED_PIN, !digitalRead(RED_PIN));
-  portEXIT_CRITICAL_ISR(&timerMux);
+  portENTER_CRITICAL_ISR(&timer1Mux);
+  digitalWrite(RED_PIN1, !digitalRead(RED_PIN1));
+  portEXIT_CRITICAL_ISR(&timer1Mux);
   // Give a semaphore that we can check in the loop
-  xSemaphoreGiveFromISR(timerSemaphore, NULL);
+  xSemaphoreGiveFromISR(timer1Semaphore, NULL);
+  //digitalWrite(RED_PIN, !digitalRead(RED_PIN));
+}
+
+void IRAM_ATTR onTimer2() {
+  // Increment the counter and set the time of ISR
+  portENTER_CRITICAL_ISR(&timer2Mux);
+  digitalWrite(RED_PIN2, !digitalRead(RED_PIN2));
+  portEXIT_CRITICAL_ISR(&timer2Mux);
+  // Give a semaphore that we can check in the loop
+  xSemaphoreGiveFromISR(timer2Semaphore, NULL);
   //digitalWrite(RED_PIN, !digitalRead(RED_PIN));
 }
 
 void setup() {
   Serial.begin(9600);
   pinMode(LED_RED, OUTPUT);
-  pinMode(RED_PIN, OUTPUT);
+  pinMode(RED_PIN1, OUTPUT);
+  pinMode(RED_PIN2, OUTPUT);
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
@@ -103,15 +118,22 @@ void setup() {
     return;
   }
 
-  timerSemaphore = xSemaphoreCreateBinary();
+  timer1Semaphore = xSemaphoreCreateBinary();
+  timer2Semaphore = xSemaphoreCreateBinary();
 
   // Set timer frequency to 1Mhz
-  timer = timerBegin(1000000);
+  timer1 = timerBegin(1000000);
+  timer2 = timerBegin(1000000);
 
   // Attach onTimer function to our timer.
-  timerAttachInterrupt(timer, &onTimer);
+  timerAttachInterrupt(timer1, &onTimer1);
+  timerAttachInterrupt(timer2, &onTimer2);
 
-  timerAlarm(timer, 1000000, true, 0);
+  timerAlarm(timer1, 1000000, true, 0);
+  timerAlarm(timer2, 1560000, true, 0);
+
+  timerStop(timer1);
+  timerStop(timer2);
 
   error = audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
     
@@ -131,14 +153,20 @@ void loop() {
       Serial.println(result);
       Serial.println(tt);
     }
-    //Serial.println("Hello there!");
-    //Serial.println(result);
-    //Serial.println(read_result);
-    //Serial.println(esp_err_to_name(error));
     if(result == 13)
     {
+      timerStart(timer1);
+      timerStart(timer2);
       Serial.println("Playing");
       audio.loop();
     } 
+    if(result == 14)
+    {
+      timerStop(timer1);
+      timerStop(timer2);
+      Serial.println("Stopped");
+      audio.pauseResume();
+      audio.setAudioPlayPosition(0);
+    };
     vTaskDelay(1);
 }
