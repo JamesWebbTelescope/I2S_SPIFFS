@@ -5,11 +5,12 @@
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include <string.h>
 
 #define I2S_DOUT      1
 #define I2S_BCLK      2
 #define I2S_LRC       3
-#define RED_PIN       10
+#define RED_PIN       17
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #define LED_CHARACTERISTIC_UUID "19b10002-e8f2-537e-4f6c-d104768a1214"
@@ -79,7 +80,11 @@ void BluetoothSetup()
 
 void IRAM_ATTR onTimer() {
   // Increment the counter and set the time of ISR
+  portENTER_CRITICAL_ISR(&timerMux);
   digitalWrite(RED_PIN, !digitalRead(RED_PIN));
+  portEXIT_CRITICAL_ISR(&timerMux);
+  // Give a semaphore that we can check in the loop
+  xSemaphoreGiveFromISR(timerSemaphore, NULL);
   //digitalWrite(RED_PIN, !digitalRead(RED_PIN));
 }
 
@@ -119,16 +124,18 @@ void setup() {
 }
  
 void loop() {
-    String tt = pLedCharacteristic.getValue();
-    if(tt.length() > 0)
+    String tt = pLedCharacteristic.getValue().c_str();
+    int result = strcmp(tt.c_str(), "Start");
+    if(result == 13)
     {
-      Serial.println(tt.c_str());
+      Serial.println(result);
+      Serial.println(tt);
     }
     //Serial.println("Hello there!");
     //Serial.println(result);
     //Serial.println(read_result);
     //Serial.println(esp_err_to_name(error));
-    if(tt.length() > 0)
+    if(result == 13)
     {
       Serial.println("Playing");
       audio.loop();
