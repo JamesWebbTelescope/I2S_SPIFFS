@@ -26,7 +26,6 @@ BLECharacteristic pPlayerCharacteristic(PLAYER_CHARACTERISTIC_UUID,
                       BLECharacteristic::PROPERTY_WRITE |
                       BLECharacteristic::PROPERTY_READ
                     );
-BLEDescriptor pPlayerDescriptor(BLEUUID((uint16_t)0x2902));
 BLEService *pService;
 esp_err_t error;
 
@@ -61,20 +60,13 @@ void BluetoothSetup()
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
   BLEService *pService = pServer->createService(SERVICE_UUID);
-  BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID,
-                                         BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE |
-                                         BLECharacteristic::PROPERTY_INDICATE |
-                                         BLECharacteristic::PROPERTY_NOTIFY
-                                       );
-  // Register the callback for the ON button characteristic
-  pCharacteristic->setValue("Hello World says Viktor");
+  BLEDescriptor pPlayerDescriptor(BLEUUID((uint16_t)0x2902));
   pService->addCharacteristic(&pPlayerCharacteristic);
   pPlayerCharacteristic.addDescriptor(&pPlayerDescriptor);
   pService->start();
   // BLEAdvertising *pAdvertising = pServer->getAdvertising();  // this still is working for backward compatibility
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pPlayerCharacteristic.setValue("Media Player");
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->setScanResponse(false);
   pAdvertising->setMinPreferred(0x0);  // functions that help with iPhone connections issue
