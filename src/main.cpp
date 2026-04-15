@@ -14,19 +14,19 @@
 #define RED_PIN2      21 
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-#define LED_CHARACTERISTIC_UUID "19b10002-e8f2-537e-4f6c-d104768a1214"
+#define PLAYER_CHARACTERISTIC_UUID "19b10002-e8f2-537e-4f6c-d104768a1214"
 
 int result;
 bool read_result;
 volatile bool pin_state = 0;
 bool deviceConnected = false;
 BLECharacteristic *pCharacteristic;
-BLECharacteristic pLedCharacteristic(LED_CHARACTERISTIC_UUID,
+BLECharacteristic pPlayerCharacteristic(PLAYER_CHARACTERISTIC_UUID,
                       BLECharacteristic::PROPERTY_NOTIFY |
                       BLECharacteristic::PROPERTY_WRITE |
                       BLECharacteristic::PROPERTY_READ
                     );
-BLEDescriptor pLedtDescriptor(BLEUUID((uint16_t)0x2902));
+BLEDescriptor pPlayerDescriptor(BLEUUID((uint16_t)0x2902));
 BLEService *pService;
 esp_err_t error;
 
@@ -70,8 +70,8 @@ void BluetoothSetup()
                                        );
   // Register the callback for the ON button characteristic
   pCharacteristic->setValue("Hello World says Viktor");
-  pService->addCharacteristic(&pLedCharacteristic);
-  pLedCharacteristic.addDescriptor(&pLedtDescriptor);
+  pService->addCharacteristic(&pPlayerCharacteristic);
+  pPlayerCharacteristic.addDescriptor(&pPlayerDescriptor);
   pService->start();
   // BLEAdvertising *pAdvertising = pServer->getAdvertising();  // this still is working for backward compatibility
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
@@ -146,7 +146,7 @@ void setup() {
 }
  
 void loop() {
-    String tt = pLedCharacteristic.getValue().c_str();
+    String tt = pPlayerCharacteristic.getValue().c_str();
     int result = strcmp(tt.c_str(), "Start");
     if(result == 13)
     {
